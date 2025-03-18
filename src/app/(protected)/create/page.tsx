@@ -2,7 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { api } from "@/trpc/react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 type FormInput = {
   repoURL: string;
@@ -10,12 +12,28 @@ type FormInput = {
   githubToken?: string;
 };
 
-function onSubmit(data: FormInput) {
-  window.alert(JSON.stringify(data, null, 2));
-  return true;
-}
 const CreatePage = () => {
   const { register, handleSubmit, reset } = useForm<FormInput>();
+  const createProject = api.project.createProject.useMutation();
+  function onSubmit(data: FormInput) {
+    createProject.mutate(
+      {
+        githubURL: data.repoURL,
+        name: data.projectName,
+        githubToken: data.githubToken,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Project created successfully");
+          reset();
+        },
+        onError: () => {
+          toast.error("Error creating project");
+        },
+      },
+    );
+    return true;
+  }
   return (
     <div className="flex h-full items-center justify-center gap-12">
       <img
@@ -53,7 +71,9 @@ const CreatePage = () => {
               placeholder="Github Access Token"
             />
             <div className="h-4"></div>
-            <Button type="submit">Create Project</Button>
+            <Button type="submit" disabled={createProject.isPending}>
+              Create Project
+            </Button>
           </form>
         </div>
       </div>
