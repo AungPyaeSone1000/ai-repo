@@ -1,7 +1,7 @@
+import { db } from "@/server/db";
 import { Octokit } from "octokit";
 export const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
-const githuburl = "https://github.com/AungPyaeSone1000/Music-Player";
 
 type Response = {
   commitMessage: String;
@@ -14,9 +14,14 @@ type Response = {
 export const getCommitHashes = async (
   githuburl: string,
 ): Promise<Response[]> => {
+  //https://github.com/Owner/RepositoryName
+  const [ owner, repo ] = githuburl.split("/").slice(-2);
+  if (!owner || !repo) {
+    throw new Error("Invalid GitHub URL");
+  }
   const { data } = await octokit.rest.repos.listCommits({
-    owner: "AungPyaeSone1000",
-    repo: "Music-Player",
+    owner,
+    repo,
   });
 
   // Sort the commits by date
@@ -27,7 +32,7 @@ export const getCommitHashes = async (
     );
   });
 
-  return sortedCommits.slice(0, 15).map((commit: any) => ({
+  return sortedCommits.slice(0, 10).map((commit: any) => ({
     commitHash: commit.sha as string,
     commitMessage: commit.commit.message ?? "",
     commitAuthor: commit.commit?.author?.name ?? "",
@@ -36,5 +41,53 @@ export const getCommitHashes = async (
   }));
 };
 
-console.log(await getCommitHashes(githuburl));
+export const pullCommits = async (projectId: string) => {
+  const { project, githubUrl } = await fetchProjectGithubUrl(projectId);
+  const commitHashes = await getCommitHashes(githubUrl);
+  const unprocessedCommits = await filterUnprocessedCommits(
+    projectId,
+    commitHashes,
+  );
+
+  return unprocessedCommits;
+};
+
+// Fetch project github url
+async function fetchProjectGithubUrl(projectId: string) {
+  const project = await db.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      githubUrl: true,
+    },
+  });
+
+  if (!project?.githubUrl) {
+    throw new Error("Project not found");
+  }
+  return { project, githubUrl: project?.githubUrl };
+}
+
+// Filter commits that have already been processed
+async function filterUnprocessedCommits(
+  projectId: string,
+  commitHashes: Response[],
+) {
+  const processedCommits = await db.commit.findMany({
+    where: {
+      projectId,
+    },
+  });
+  const unprocessedCommits = commitHashes.filter(
+    (commit) =>
+      !processedCommits.some(
+        (processedCommit) => processedCommit.commitHash === commit.commitHash,
+      ),
+  );
+  return unprocessedCommits;
+}
+
+pullCommits("cm8fuvqk70000zbbgkjc5r7gu").then(console.log);
+
 
