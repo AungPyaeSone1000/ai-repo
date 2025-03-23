@@ -5,7 +5,7 @@ const model = genAi.getGenerativeModel({
   model: "gemini-1.5-flash",
 });
 
-export const summariseCommit = async (diff: string) => {
+export const summariseCommitAI = async (diff: string) => {
   //https://github.com/Owner/RepositoryName/commit/commitHash.diff
   const response = await model.generateContent([
     `You are an expert programmer, and you are trying to summarise a git diff.
@@ -42,4 +42,4 @@ export const summariseCommit = async (diff: string) => {
   return response.response.text();
 };
 
-console.log(await summariseCommit(``));
+console.log(await summariseCommitAI(``));

@@ -1,21 +1,22 @@
 import { db } from "@/server/db";
+import axios from "axios";
 import { Octokit } from "octokit";
+import { summariseCommitAI } from "./gemini";
 export const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
-
 type Response = {
-  commitMessage: String;
-  commitHash: String;
-  commitAuthor: String;
-  commitAuthorAvatar: String;
-  commitDate: String;
+  commitMessage: string;
+  commitHash: string;
+  commitAuthor: string;
+  commitAuthorAvatar: string;
+  commitDate: string;
 };
 
 export const getCommitHashes = async (
   githuburl: string,
 ): Promise<Response[]> => {
   //https://github.com/Owner/RepositoryName
-  const [ owner, repo ] = githuburl.split("/").slice(-2);
+  const [owner, repo] = githuburl.split("/").slice(-2);
   if (!owner || !repo) {
     throw new Error("Invalid GitHub URL");
   }
@@ -48,8 +49,35 @@ export const pullCommits = async (projectId: string) => {
     projectId,
     commitHashes,
   );
+  const summaryResponses = await Promise.allSettled(
+    unprocessedCommits.map((commit) => {
+      return summariseCommit(githubUrl, commit.commitHash);
+    }),
+  );
 
-  return unprocessedCommits;
+  const summaries = summaryResponses.map((response) => {
+    if (response.status === "fulfilled") {
+      return response.value as string;
+    }
+    return "";
+  });
+
+  //Save commits in Db
+  const commits = await db.commit.createMany({
+    data: summaries.map((summary, index) => {
+      return {
+        projectId: projectId,
+        commitHash: unprocessedCommits[index]!.commitHash,
+        commitMessage: unprocessedCommits[index]!.commitMessage,
+        commitAuthor: unprocessedCommits[index]!.commitAuthor,
+        commitAuthorAvatar: unprocessedCommits[index]!.commitAuthorAvatar,
+        commitDate: unprocessedCommits[index]!.commitDate,
+        summary: summary,
+      }
+    })
+  })
+
+  return commits;
 };
 
 // Fetch project github url
@@ -88,6 +116,13 @@ async function filterUnprocessedCommits(
   return unprocessedCommits;
 }
 
-pullCommits("cm8fuvqk70000zbbgkjc5r7gu").then(console.log);
+// Summarise commit using gemini.ts
+async function summariseCommit(githubUrl: string, commitHash: string) {
+  const { data } = await axios.get(`${githubUrl}/commit/${commitHash}.diff`, {
+    headers: {
+      Accept: "application/vnd.github.v3.diff",
+    },
+  });
 
-
+  return (await summariseCommitAI(data)) || "";
+}
