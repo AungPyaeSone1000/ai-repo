@@ -41,5 +41,3 @@ export const summariseCommitAI = async (diff: string) => {
 
   return response.response.text();
 };
-
-console.log(await summariseCommitAI(``));
