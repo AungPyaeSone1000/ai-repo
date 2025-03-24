@@ -37,7 +37,7 @@ export const getCommitHashes = async (
     commitHash: commit.sha as string,
     commitMessage: commit.commit.message ?? "",
     commitAuthor: commit.commit?.author?.name ?? "",
-    commitAuthorAvatar: commit.commit?.author?.avatar_url ?? "",
+    commitAuthorAvatar: commit.author?.avatar_url ?? "",
     commitDate: commit.commit?.author?.date ?? "",
   }));
 };
@@ -73,9 +73,9 @@ export const pullCommits = async (projectId: string) => {
         commitAuthorAvatar: unprocessedCommits[index]!.commitAuthorAvatar,
         commitDate: unprocessedCommits[index]!.commitDate,
         summary: summary,
-      }
-    })
-  })
+      };
+    }),
+  });
 
   return commits;
 };
